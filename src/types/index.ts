@@ -47,6 +47,10 @@ export interface VehicleRecord {
   vehicleType: string;
   createdAt: Date;
   timestamp: Date;
+  exitTimestamp?: Date | string; // Could be a Date object or a Timestamp
+  exitPlateImageUrl?: string;    // URL for the exit plate image
+  exitPlateImageLocalUri?: string; // Local URI for the exit plate image
+  processingStatus?: 'pending' | 'completed';
   processed: boolean;
 }
 

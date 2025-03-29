@@ -25,6 +25,12 @@ export default function VehicleRecordsPage() {
     setLoading(true);
     try {
       const data = await getVehicleRecords();
+      // Add console.log to check the exit timestamp data
+      console.log('Vehicle records data:', data.map(r => ({ 
+        id: r.id, 
+        exitTimestamp: r.exitTimestamp, 
+        exitPlateImageUrl: r.exitPlateImageUrl 
+      })));
       setRecords(data);
     } catch (error) {
       console.error('Error fetching vehicle records:', error);
@@ -32,6 +38,41 @@ export default function VehicleRecordsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (records.length > 0) {
+      console.log('Sample record:', records[0]);
+      const sampleWithExit = records.find(r => r.exitTimestamp || r.exitPlateImageUrl);
+      if (sampleWithExit) {
+        console.log('Sample with exit:', sampleWithExit);
+        console.log('Exit timestamp type:', typeof sampleWithExit.exitTimestamp);
+        if (sampleWithExit.exitTimestamp) {
+          try {
+            console.log('Exit timestamp date attempt:', new Date(sampleWithExit.exitTimestamp));
+          } catch (e) {
+            console.error('Failed to create date from exitTimestamp:', e);
+          }
+        }
+      }
+    }
+  }, [records]);
+
+  // Add more debugging to examine the exitTimestamp format
+  useEffect(() => {
+    if (records.length > 0) {
+      const recordsWithExit = records.filter(r => r.exitPlateImageUrl);
+      console.log('Records with exit images:', recordsWithExit.length);
+      
+      recordsWithExit.forEach(record => {
+        console.log('Exit record:', { 
+          id: record.id,
+          exitTimestamp: record.exitTimestamp,
+          exitTimeType: typeof record.exitTimestamp,
+          exitPlateImageUrl: record.exitPlateImageUrl ? 'exists' : 'missing'
+        });
+      });
+    }
+  }, [records]);
 
   const handleMarkAsProcessed = async (id: string) => {
     try {
@@ -86,6 +127,30 @@ export default function VehicleRecordsPage() {
     // saveAs(blob, `vehicle-records-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
+  // Helper function to calculate duration
+  const calculateDuration = (startDate: Date, endDate: Date): string => {
+    const durationMs = endDate.getTime() - startDate.getTime();
+    const minutes = Math.floor(durationMs / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+      return `${days}d ${hours % 24}h ${minutes % 60}m`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    } else {
+      return `${minutes}m`;
+    }
+  };
+
+  // Add the formatDate function
+  const formatDate = (dateString: any) => {
+    console.log(dateString)
+      const date = new Date(dateString.seconds ? dateString.seconds * 1000 : dateString);
+      return format(date, 'dd/MM/yyyy HH:mm');
+
+  };
+
   const filteredRecords = records.filter(record => {
     // Apply search filter
     const matchesSearch = 
@@ -113,71 +178,57 @@ export default function VehicleRecordsPage() {
   }
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
+    <div className="min-h-screen">
+    
+      <div className="px-4 py-2 bg-white">
+        <div className="flex flex-row items-center justify-between" >
           <div>
-            <h1 className="text-4xl font-bold text-gray-800 tracking-tight">Registro de Vehículos</h1>
-            <p className="text-gray-600 mt-2 text-lg">Gestión de entradas y salidas de vehículos</p>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-0">Registro de Vehículos</h1>
           </div>
+          {/* Filtros */}
+        <div className="w-[25vw]">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-grow">
+              <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <svg className="h-4 w-4 text-gray-400 group-hover:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+              </div>
+              <input
+          type="text"
+          placeholder="Buscar por nombre, placa o casa"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl
+               text-sm text-gray-700 placeholder-gray-400
+               shadow-sm hover:shadow-md
+               focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-500 ease-in-out"
+              />
+              </div>
+            </div>
+            </div>
+        </div>
           <div className="flex flex-wrap gap-3">
             <button
               onClick={handleExportToExcel}
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 flex items-center"
+              className="px-4 py-1.5 bg-black hover:bg-black/80 text-white rounded-full border-2 border-gray-300 cursor-pointer flex items-center gap-2"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
               </svg>
-              <span>Exportar a Excel</span>
+              <span className='text-sm'>Exportar a Excel</span>
             </button>
-            <Link
-              href="/dashboard"
-              className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 flex items-center"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-              </svg>
-              <span>Volver al Panel</span>
-            </Link>
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8 hover:shadow-xl transition-all duration-300">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex-grow">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Buscar por nombre, placa o casa..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700 font-medium">Filtrar por:</span>
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as 'all' | 'entry' | 'exit')}
-                className="px-4 py-3 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              >
-                <option value="all">Todos los Registros</option>
-                <option value="entry">Solo Entradas</option>
-                <option value="exit">Solo Salidas</option>
-              </select>
-            </div>
-          </div>
+        
+
+       
         </div>
 
-        {/* Tabla de Registros */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden mb-8 hover:shadow-xl transition-all duration-300">
+         {/* Tabla de Registros */}
+         <div className="bg-white border border-gray-200 overflow-hidden ">
           {filteredRecords.length === 0 ? (
             <div className="p-12 text-center">
               <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -191,6 +242,9 @@ export default function VehicleRecordsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fecha y Hora de Entrada
+                    </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Conductor
                     </th>
@@ -201,108 +255,96 @@ export default function VehicleRecordsPage() {
                       Casa
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tipo
+                      Fecha y Hora de salida
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fecha y Hora
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
+                  
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {filteredRecords.map((record) => (
-                    <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{record.driverName}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-gray-900">{record.licensePlate}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Bloque {record.houseBlock}, #{record.houseNumber}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          record.entryType === 'entry' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {record.entryType === 'entry' ? 'Entrada' : 'Salida'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                    <tr key={record.id} className="hover:bg-blue-50  cursor-pointer" onClick={() => {
+                      setSelectedRecord(record);
+                      setIsModalOpen(true);
+                    }}>
+
+
+                       <td className="px-6 py-2 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
                           {format(record.createdAt, 'dd/MM/yyyy HH:mm')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          record.processed 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {record.processed ? 'Procesado' : 'Pendiente'}
-                        </span>
+                      <td className="px-6 py-2 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{record.driverName}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedRecord(record);
-                              setIsModalOpen(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 p-1 rounded-full transition-colors"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                            </svg>
-                          </button>
-                          {!record.processed && (
-                            <button
-                              onClick={() => handleMarkAsProcessed(record.id)}
-                              className="text-green-600 hover:text-green-900 hover:bg-green-50 p-1 rounded-full transition-colors"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                              </svg>
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteRecord(record.id)}
-                            className="text-red-600 hover:text-red-900 hover:bg-red-50 p-1 rounded-full transition-colors"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                          </button>
+                      <td className="px-6 py-2 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-gray-900">{record.licensePlate}</div>
+                      </td>
+                      <td className="px-6 py-2 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">Bloque {record.houseBlock}, #{record.houseNumber}</div>
+                      </td>
+                      <td className="px-6 py-2 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {(() => {
+                            // If there's an exitPlateImageUrl or exitTimestamp, we know there's an exit
+                            if (record.exitPlateImageUrl || record.exitTimestamp) {
+                              try {
+                                // Format exitTimestamp using our simplified function
+                                if (record.exitTimestamp) {
+                                  const exitTimeFormatted = formatDate(record.exitTimestamp);
+                                  
+                                  // If we can calculate duration
+                                  try {
+                                    const entryDate = new Date(record.timestamp || record.createdAt);
+                                    const exitDate = new Date(record.exitTimestamp);
+                                    
+                                    if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
+                                      const duration = calculateDuration(entryDate, exitDate);
+                                      return `${exitTimeFormatted} (${duration})`;
+                                    }
+                                  } catch (e) {
+                                    console.error("Error calculating duration:", e);
+                                  }
+                                  
+                                  // Just return the formatted date if calculating duration fails
+                                  return exitTimeFormatted;
+                                }
+                                return "Salida registrada";
+                              } catch (error) {
+                                console.error("Exit timestamp error:", error);
+                                return "Error al procesar fecha";
+                              }
+                            }
+                            
+                            // No exit data
+                            return (
+                              <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                Pendiente
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
+                     
+                     
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
 
         {/* Modal de Detalles */}
         {isModalOpen && selectedRecord && (
-          <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fadeIn">
-              <div className="sticky top-0 bg-white z-10 flex justify-between items-center p-6 border-b">
-                <h2 className="text-2xl font-bold text-gray-800">Detalles del Registro</h2>
+          <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-fadeIn">
+              <div className="sticky top-0 bg-white z-10 flex justify-between items-center p-2 pl-6 px-4 border-b border-gray-200">
+                <h2 className="text font-bold text-gray-800">Detalles del Registro</h2>
                 <button
                   onClick={() => {
                     setIsModalOpen(false);
                     setSelectedRecord(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -315,71 +357,48 @@ export default function VehicleRecordsPage() {
                   {/* Información del vehículo */}
                   <div>
                     <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                      <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                        </svg>
+                      <h3 className="text font-bold text-gray-800 mb-4 flex items-center">
+
                         Información del Vehículo
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <p className="text-sm text-gray-500">Placa</p>
-                          <p className="text-lg font-semibold">{selectedRecord.licensePlate}</p>
+                          <p className="text font-semibold">{selectedRecord.licensePlate}</p>
                         </div>
                         <div className="space-y-1">
                           <p className="text-sm text-gray-500">Tipo de Vehículo</p>
-                          <p className="text-lg font-semibold">{selectedRecord.vehicleType || 'No especificado'}</p>
+                          <p className="text font-semibold">{selectedRecord.vehicleType || 'No especificado'}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                      <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                      <h3 className="text font-bold text-gray-800 mb-4 flex items-center">
+
                         Información del Conductor
                       </h3>
                       <div className="space-y-4">
                         <div className="space-y-1">
                           <p className="text-sm text-gray-500">Nombre</p>
-                          <p className="text-lg font-semibold">{selectedRecord.driverName}</p>
+                          <p className="text font-semibold">{selectedRecord.driverName}</p>
                         </div>
                         <div className="space-y-1">
                           <p className="text-sm text-gray-500">Destino</p>
-                          <p className="text-lg font-semibold">Bloque {selectedRecord.houseBlock}, #{selectedRecord.houseNumber}</p>
+                          <p className="text font-semibold">Bloque {selectedRecord.houseBlock}, #{selectedRecord.houseNumber}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                      <h3 className="text font-bold text-gray-800 mb-4 flex items-center">
+
                         Detalles del Registro
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <p className="text-sm text-gray-500">Tipo</p>
-                          <p className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
-                            selectedRecord.entryType === 'entry' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {selectedRecord.entryType === 'entry' ? 'Entrada' : 'Salida'}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm text-gray-500">Estado</p>
-                          <p className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
-                            selectedRecord.processed ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {selectedRecord.processed ? 'Procesado' : 'Pendiente'}
-                          </p>
-                        </div>
                         <div className="space-y-1 col-span-2">
                           <p className="text-sm text-gray-500">Fecha y Hora</p>
-                          <p className="text-lg font-semibold">{format(selectedRecord.createdAt, 'PPpp')}</p>
+                          <p className="text font-semibold">{format(selectedRecord.createdAt, 'PPpp')}</p>
                         </div>
                       </div>
                     </div>
@@ -387,23 +406,17 @@ export default function VehicleRecordsPage() {
                   
                   {/* Imágenes */}
                   <div className="space-y-6">
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center">
-                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Evidencia Fotográfica
-                    </h3>
-                    
+
                     {selectedRecord.plateImageUrl && (
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <p className="text-md font-medium text-gray-800 mb-3">Imagen de Placa</p>
-                        <div className="relative h-64 w-full border rounded-lg overflow-hidden bg-white">
+                        <div className="relative h-64 w-full border border-gray-300 rounded-lg overflow-hidden bg-white">
                           <Image 
-                            src={selectedRecord.plateImageUrl} 
-                            alt="Placa del vehículo" 
-                            fill
-                            style={{ objectFit: 'contain' }}
-                            className="hover:scale-110 transition-transform duration-300"
+                          src={selectedRecord.plateImageUrl} 
+                          alt="Placa del vehículo" 
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          className=""
                           />
                         </div>
                       </div>
@@ -412,13 +425,13 @@ export default function VehicleRecordsPage() {
                     {selectedRecord.idImageUrl && (
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <p className="text-md font-medium text-gray-800 mb-3">Imagen de Identificación</p>
-                        <div className="relative h-64 w-full border rounded-lg overflow-hidden bg-white">
+                        <div className="relative h-64 w-full border border-gray-300 rounded-lg overflow-hidden bg-white">
                           <Image 
                             src={selectedRecord.idImageUrl} 
                             alt="Identificación" 
                             fill
-                            style={{ objectFit: 'contain' }}
-                            className="hover:scale-110 transition-transform duration-300"
+                            style={{ objectFit: 'cover' }}
+                            className=""
                           />
                         </div>
                       </div>
@@ -436,8 +449,8 @@ export default function VehicleRecordsPage() {
                 </div>
               </div>
               
-              <div className="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-end space-x-3">
-                {!selectedRecord.processed && (
+              <div className="sticky bottom-0 bg-gray-50 p-4 flex justify-end space-x-3">
+                {/* {!selectedRecord.processed && (
                   <button
                     onClick={() => {
                       handleMarkAsProcessed(selectedRecord.id);
@@ -450,15 +463,15 @@ export default function VehicleRecordsPage() {
                     </svg>
                     Marcar como Procesado
                   </button>
-                )}
+                )} */}
                 <button
                   onClick={() => {
-                    handleDeleteRecord(selectedRecord.id);
+                  handleDeleteRecord(selectedRecord.id);
                   }}
-                  className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center"
+                  className="px-5 py-1.5 bg-white border border-red-300 text-red-600 rounded-lg shadow-sm hover:bg-red-50 transition-all duration-200 flex items-center"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                   </svg>
                   Eliminar Registro
                 </button>
@@ -467,7 +480,7 @@ export default function VehicleRecordsPage() {
                     setIsModalOpen(false);
                     setSelectedRecord(null);
                   }}
-                  className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg shadow-sm hover:bg-gray-50 transition-all duration-200"
+                  className="px-5 py-1.5 bg-white border-gray-300 text-gray-700 rounded-lg shadow-sm hover:bg-gray-50 transition-all duration-200"
                 >
                   Cerrar
                 </button>
