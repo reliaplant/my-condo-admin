@@ -8,6 +8,8 @@ import {
 import { getDashboardMetrics, generateMockDashboardData } from '@/services/dashboardService';
 import { DashboardMetrics } from '@/types';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 // Paleta de colores más elegante
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -22,6 +24,16 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [useMockData, setUseMockData] = useState(true);
+  
+  const { isAuthenticated, auth, hasUserRole } = useAuth();
+  const router = useRouter();
+  
+  // Check authentication
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,8 +45,12 @@ export default function Dashboard() {
           setMetrics(mockData);
         } else {
           // Usar datos reales de Firebase
-          const data = await getDashboardMetrics();
-          setMetrics(data);
+          // If the user is an admin or superAdmin, get data for their company
+          if (isAuthenticated && auth.profile) {
+            const companyId = auth.profile.companyId;
+            const data = await getDashboardMetrics(companyId);
+            setMetrics(data);
+          }
         }
       } catch (error) {
         console.error('Error al cargar datos del panel:', error);
@@ -46,8 +62,15 @@ export default function Dashboard() {
       }
     };
 
-    fetchData();
-  }, [useMockData]);
+    // Only fetch data if authenticated
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [useMockData, isAuthenticated, auth.profile]);
+
+  if (!isAuthenticated) {
+    return null; // Will redirect in useEffect
+  }
 
   if (loading) {
     return (
@@ -88,7 +111,11 @@ export default function Dashboard() {
         <div className="flex justify-between items-center mb-10">
           <div>
             <h1 className="text-xl font-bold text-gray-800 tracking-tight">Panel Principal</h1>
-            <p className="text-gray-600 text-lg">Resumen de actividades y métricas del condominio</p>
+            <p className="text-gray-600 text-lg">
+              {auth.profile?.companyId
+                ? `Resumen de actividades y métricas de ${auth.profile.role === 'admin' ? 'su empresa' : 'la empresa'}`
+                : 'Resumen de actividades y métricas del sistema'}
+            </p>
           </div>
           <div className="flex items-center space-x-6">
             <div className="bg-white rounded shadow-md p-2 flex items-center">

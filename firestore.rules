@@ -1,0 +1,204 @@
+// firestore.rules
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if the user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is a superAdmin
+    function isSuperAdmin() {
+      return isAuth() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superAdmin';
+    }
+    
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return isAuth() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if the user belongs to a company
+    function belongsToCompany(companyId) {
+      return isAuth() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+    
+    // Helper function to check if the user is an admin of a company
+    function isCompanyAdmin(companyId) {
+      return isAuth() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+    
+    // Helper function to check if user is active
+    function isActiveUser() {
+      return isAuth() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own profile
+      // SuperAdmins can read and write all user profiles
+      // Company admins can read and update users in their company (but not change roles)
+      allow read: if isAuth() && (request.auth.uid == userId || isSuperAdmin() || 
+        (isCompanyAdmin(get(/databases/$(database)/documents/users/$(userId)).data.companyId)));
+      
+      allow create: if isSuperAdmin() || 
+        (isAdmin() && resource.data.role == 'employee' && resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+      
+      allow update: if isAuth() && isActiveUser() && (
+        // Users can update their own non-sensitive fields
+        (request.auth.uid == userId && 
+          !('role' in request.resource.data) && 
+          !('companyId' in request.resource.data) && 
+          !('isActive' in request.resource.data)) ||
+        
+        // SuperAdmins can update everything
+        isSuperAdmin() ||
+        
+        // Company admins can update non-sensitive fields of users in their company
+        (isCompanyAdmin(resource.data.companyId) && 
+          !('role' in request.resource.data) && 
+          !('companyId' in request.resource.data))
+      );
+      
+      allow delete: if isSuperAdmin();
+    }
+    
+    // Companies collection
+    match /companies/{companyId} {
+      // Anyone can read company data
+      // Only superAdmins can create or delete companies
+      // SuperAdmins and company admins can update company details
+      allow read: if isAuth() && isActiveUser();
+      
+      allow create: if isSuperAdmin();
+      
+      allow update: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || isCompanyAdmin(companyId)
+      );
+      
+      allow delete: if isSuperAdmin();
+    }
+    
+    // Vehicle Records collection
+    match /vehicleRecords/{recordId} {
+      // Users can read, create, update, and delete vehicle records for their company
+      allow read: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(resource.data.companyId)
+      );
+      
+      allow create: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(request.resource.data.companyId)
+      );
+      
+      allow update: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(resource.data.companyId)
+      );
+      
+      allow delete: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || (isAdmin() && belongsToCompany(resource.data.companyId))
+      );
+    }
+    
+    // Entry Records collection
+    match /entryRecords/{recordId} {
+      // Users can read, create, update, and delete entry records for their company
+      allow read: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(resource.data.companyId)
+      );
+      
+      allow create: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(request.resource.data.companyId)
+      );
+      
+      allow update: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(resource.data.companyId)
+      );
+      
+      allow delete: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || (isAdmin() && belongsToCompany(resource.data.companyId))
+      );
+    }
+    
+    // Incidents collection
+    match /incidents/{incidentId} {
+      // Users can read, create, update, and delete incidents for their company
+      allow read: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(resource.data.companyId)
+      );
+      
+      allow create: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(request.resource.data.companyId)
+      );
+      
+      allow update: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || belongsToCompany(resource.data.companyId)
+      );
+      
+      allow delete: if isAuth() && isActiveUser() && (
+        isSuperAdmin() || (isAdmin() && belongsToCompany(resource.data.companyId))
+      );
+    }
+  }
+}
+
+// storage.rules
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if the user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is active
+    function isActiveUser(uid) {
+      return firestore.exists(/databases/(default)/documents/users/$(uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(uid)).data.isActive == true;
+    }
+    
+    // Helper function to check if the user is a superAdmin
+    function isSuperAdmin(uid) {
+      return firestore.exists(/databases/(default)/documents/users/$(uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(uid)).data.role == 'superAdmin';
+    }
+    
+    // Helper function to check if the user is an admin
+    function isAdmin(uid) {
+      return firestore.exists(/databases/(default)/documents/users/$(uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if the user belongs to a company
+    function belongsToCompany(uid, companyId) {
+      return firestore.exists(/databases/(default)/documents/users/$(uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(uid)).data.companyId == companyId;
+    }
+    
+    // Company folders
+    match /companies/{companyId}/{allPaths=**} {
+      allow read: if isAuth() && isActiveUser(request.auth.uid) && (
+        isSuperAdmin(request.auth.uid) || belongsToCompany(request.auth.uid, companyId)
+      );
+      
+      allow write: if isAuth() && isActiveUser(request.auth.uid) && (
+        isSuperAdmin(request.auth.uid) || belongsToCompany(request.auth.uid, companyId)
+      );
+    }
+    
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

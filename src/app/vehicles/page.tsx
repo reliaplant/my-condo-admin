@@ -7,7 +7,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-// import { saveAs } from 'file-saver';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function VehicleRecordsPage() {
   const [records, setRecords] = useState<VehicleRecord[]>([]);
@@ -17,20 +18,35 @@ export default function VehicleRecordsPage() {
   const [selectedRecord, setSelectedRecord] = useState<VehicleRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const { isAuthenticated, auth, hasUserRole } = useAuth();
+  const router = useRouter();
+  
+  // Check authentication
   useEffect(() => {
-    fetchRecords();
-  }, []);
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    if (isAuthenticated && auth.profile) {
+      fetchRecords();
+    }
+  }, [isAuthenticated, auth.profile]);
 
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      const data = await getVehicleRecords();
+      const companyId = auth.profile?.companyId;
+      const data = await getVehicleRecords(companyId);
       // Add console.log to check the exit timestamp data
       console.log('Vehicle records data:', data.map(r => ({ 
         id: r.id, 
         exitTimestamp: r.exitTimestamp, 
         exitPlateImageUrl: r.exitPlateImageUrl 
       })));
+      // If the user is authenticated, get records for their company
+
       setRecords(data);
     } catch (error) {
       console.error('Error fetching vehicle records:', error);
@@ -86,9 +102,16 @@ export default function VehicleRecordsPage() {
   };
 
   const handleDeleteRecord = async (id: string) => {
+    // Only admin and superadmin can delete records
+    if (!hasUserRole(['admin', 'superAdmin'])) {
+      alert('No tienes permisos para eliminar registros');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
       try {
-        await deleteVehicleRecord(id);
+        const companyId = auth.profile?.companyId;
+        await deleteVehicleRecord(id, companyId);
         setRecords(records.filter(record => record.id !== id));
         if (selectedRecord?.id === id) {
           setSelectedRecord(null);
@@ -123,8 +146,15 @@ export default function VehicleRecordsPage() {
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
     
-    // Save file
-    // saveAs(blob, `vehicle-records-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    // Create a download link
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vehicle-records-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+    a.click();
+    
+    // Cleanup
+    window.URL.revokeObjectURL(url);
   };
 
   // Helper function to calculate duration
@@ -163,6 +193,10 @@ export default function VehicleRecordsPage() {
     
     return matchesSearch && matchesFilter;
   });
+
+  if (!isAuthenticated) {
+    return null; // Will redirect in useEffect
+  }
 
   if (loading) {
     return (
@@ -268,7 +302,7 @@ export default function VehicleRecordsPage() {
                     }}>
 
 
-                       <td className="px-6 py-2 whitespace-nowrap">
+                      <td className="px-6 py-2 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
                           {format(record.createdAt, 'dd/MM/yyyy HH:mm')}
                         </div>
@@ -276,8 +310,8 @@ export default function VehicleRecordsPage() {
                       <td className="px-6 py-2 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{record.driverName}</div>
                       </td>
-                      <td className="px-6 py-2 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-gray-900">{record.licensePlate}</div>
+                       <td className="px-6 py-2 whitespace-nowrap">
+                       <div className="text-sm font-semibold text-gray-900">{record.licensePlate}</div>
                       </td>
                       <td className="px-6 py-2 whitespace-nowrap">
                         <div className="text-sm text-gray-900">Bloque {record.houseBlock}, #{record.houseNumber}</div>
@@ -463,18 +497,21 @@ export default function VehicleRecordsPage() {
                     </svg>
                     Marcar como Procesado
                   </button>
-                )} */}
-                <button
-                  onClick={() => {
-                  handleDeleteRecord(selectedRecord.id);
-                  }}
-                  className="px-5 py-1.5 bg-white border border-red-300 text-red-600 rounded-lg shadow-sm hover:bg-red-50 transition-all duration-200 flex items-center"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                  Eliminar Registro
-                </button>
+                )}
+                {/* Only show delete button for admin/superAdmin */}
+                {hasUserRole(['admin', 'superAdmin']) && (
+                  <button
+                    onClick={() => {
+                      handleDeleteRecord(selectedRecord.id);
+                    }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Eliminar Registro
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setIsModalOpen(false);
