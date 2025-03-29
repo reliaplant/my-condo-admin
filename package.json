@@ -2,6 +2,9 @@
   "name": "my-condo-admin",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "18"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,10 +17,10 @@
     "firebase": "^11.5.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
-    "lucide-react": "^0.336.0",
+    "lucide-react": "^0.485.0",
     "next": "15.2.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react-dom": "^19.1.0",
     "react-dropzone": "^14.2.3",
     "react-hook-form": "^7.51.0",
     "recharts": "^2.12.1",
@@ -26,9 +29,9 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/react": "^19",
+    "@types/react": "19.0.12",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "5.8.2"
   }
 }
