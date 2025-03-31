@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+import { 
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { getDashboardMetrics, generateMockDashboardData } from '@/services/dashboardService';
@@ -25,17 +25,30 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [useMockData, setUseMockData] = useState(true);
   
-  const { isAuthenticated, auth, hasUserRole } = useAuth();
+  const { isAuthenticated, isInitialized, auth } = useAuth();
   const router = useRouter();
   
-  // Check authentication
+  // First check authentication - run this separately to avoid race conditions
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/unauthorized');
+    // Wait until auth is initialized before checking
+    if (!isInitialized) {
+      return;
     }
-  }, [isAuthenticated, router]);
+    
+    // After auth is initialized, check if user is authenticated
+    if (!isAuthenticated) {
+      console.log('Dashboard: User not authenticated, redirecting');
+      router.push('/login'); // or to your unauthorized page
+    }
+  }, [isAuthenticated, isInitialized, router]);
 
+  // Load dashboard data after confirming auth status
   useEffect(() => {
+    // Only fetch data if user is authenticated and auth is initialized
+    if (!isInitialized || !isAuthenticated) {
+      return;
+    }
+    
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -45,12 +58,10 @@ export default function Dashboard() {
           setMetrics(mockData);
         } else {
           // Usar datos reales de Firebase
-          // If the user is an admin or superAdmin, get data for their company
-          if (isAuthenticated && auth.profile) {
-            const companyId = auth.profile.companyId;
-            const data = await getDashboardMetrics(companyId);
-            setMetrics(data);
-          }
+          // Get company ID from authenticated user
+          const companyId = auth.profile?.companyId;
+          const data = await getDashboardMetrics(companyId);
+          setMetrics(data);
         }
       } catch (error) {
         console.error('Error al cargar datos del panel:', error);
@@ -62,14 +73,36 @@ export default function Dashboard() {
       }
     };
 
-    // Only fetch data if authenticated
-    if (isAuthenticated) {
-      fetchData();
-    }
-  }, [useMockData, isAuthenticated, auth.profile]);
+    fetchData();
+  }, [useMockData, isAuthenticated, isInitialized, auth.profile]);
 
+  // Don't render anything until auth is initialized
+  if (!isInitialized) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="w-16 h-16">
+          <svg className="animate-spin w-full h-full text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't show content if not authenticated - redirect will happen in useEffect
   if (!isAuthenticated) {
-    return null; // Will redirect in useEffect
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="w-16 h-16">
+          <svg className="animate-spin w-full h-full text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <p className="ml-3 text-lg text-gray-700">Redirecting to login...</p>
+      </div>
+    );
   }
 
   if (loading) {
@@ -88,13 +121,13 @@ export default function Dashboard() {
   if (!metrics) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="text-center bg-white p-10 rounded shadow-2xl">
+        <div className="text-center bg-white p-10 rounded-xl shadow-2xl max-w-lg">
           <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
           <h1 className="text-2xl font-bold mb-4 text-gray-800">Error al Cargar el Panel</h1>
           <p className="text-gray-600 mb-6">No se pudieron cargar los datos del panel. Por favor intente nuevamente.</p>
-          <button
+          <button 
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
             onClick={() => window.location.reload()}
           >
@@ -106,23 +139,23 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen p-[2vw] from-gray-50">
-      <div className="">
+    <div className="min-h-screen p-6 bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Panel Principal</h1>
-            <p className="text-gray-600 text-lg">
+            <h1 className="text-4xl font-bold text-gray-800 tracking-tight">Panel Principal</h1>
+            <p className="text-gray-600 mt-2 text-lg">
               {auth.profile?.companyId
                 ? `Resumen de actividades y métricas de ${auth.profile.role === 'admin' ? 'su empresa' : 'la empresa'}`
                 : 'Resumen de actividades y métricas del sistema'}
             </p>
           </div>
           <div className="flex items-center space-x-6">
-            <div className="bg-white rounded shadow-md p-2 flex items-center">
+            <div className="bg-white rounded-xl shadow-md p-2 flex items-center">
               <label className="inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useMockData}
+                <input 
+                  type="checkbox" 
+                  checked={useMockData} 
                   onChange={() => setUseMockData(!useMockData)}
                   className="sr-only peer"
                 />
@@ -135,8 +168,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Gráficos Fila 1 - Mejora estética */}
-        <div className='bg-white border-b border-gray-200 p-4 justify-between flex items-center'>
+                {/* Gráficos Fila 1 - Mejora estética */}
+                <div className='bg-white border-b border-gray-200 p-4 justify-between flex items-center'>
           <h2 className="text font-bold text-gray-800">Entradas vs Salidas</h2>
           <div className="flex items-center justify-between">
             <select

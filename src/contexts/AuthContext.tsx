@@ -20,6 +20,31 @@ import {
   updateUserProfile
 } from '@/lib/authService';
 
+// Define a default state for SSR safety
+const defaultAuthState: AuthState = {
+  user: null,
+  profile: null,
+  initialized: false,
+  loading: true
+};
+
+// Define default context values for SSR safety
+const defaultContextValue: AuthContextProps = {
+  auth: defaultAuthState,
+  isAuthenticated: false,
+  isInitialized: false,
+  isLoading: true,
+  login: async () => { throw new Error('AuthProvider not initialized') },
+  logout: async () => { throw new Error('AuthProvider not initialized') },
+  register: async () => { throw new Error('AuthProvider not initialized') },
+  resetUserPassword: async () => { throw new Error('AuthProvider not initialized') },
+  updateProfile: async () => { throw new Error('AuthProvider not initialized') },
+  changeUserPassword: async () => { throw new Error('AuthProvider not initialized') },
+  changeUserEmail: async () => { throw new Error('AuthProvider not initialized') },
+  hasUserRole: () => false,
+  userBelongsToCompany: () => false
+};
+
 interface AuthContextProps {
   auth: AuthState;
   isAuthenticated: boolean;
@@ -36,15 +61,11 @@ interface AuthContextProps {
   userBelongsToCompany: (companyId: string) => boolean;
 }
 
-const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+// Initialize context with default values for SSR safety
+const AuthContext = createContext<AuthContextProps>(defaultContextValue);
 
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [auth, setAuth] = useState<AuthState>({
-    user: null,
-    profile: null,
-    initialized: false,
-    loading: true
-  });
+  const [auth, setAuth] = useState<AuthState>(defaultAuthState);
   
   // Initialize auth state on mount
   useEffect(() => {
@@ -241,12 +262,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   );
 };
 
+// Modified useAuth hook that's safe for SSR and doesn't throw errors
 export const useAuth = (): AuthContextProps => {
+  // Get the context
   const context = useContext(AuthContext);
-  
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  
+  // The context should now always have at least the default values
   return context;
 };
