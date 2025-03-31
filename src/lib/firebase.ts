@@ -21,6 +21,6 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 // Default company ID (hardcoded for now)
-export const DEFAULT_COMPANY_ID = "thandi";
+export const DEFAULT_COMPANY_ID = process.env.NEXT_PUBLIC_DEFAULT_COMPANY_ID || "thandi";
 
 export { app, db, auth, storage };

@@ -6,22 +6,26 @@ import { storage, DEFAULT_COMPANY_ID } from "./firebase";
  * @param file The file to upload
  * @param path The path inside the company folder (without company ID)
  * @param companyId The company ID
+ * @param maxSizeInMB The maximum file size in MB (default is 5MB)
  * @returns The download URL of the uploaded file
  */
 export const uploadFile = async (
   file: File, 
-  path: string, 
-  companyId: string = DEFAULT_COMPANY_ID
+  path: string,
+  companyId: string = DEFAULT_COMPANY_ID,
+  maxSizeInMB = 5,
 ): Promise<string> => {
-  const storageRef = ref(storage, `companies/${companyId}/${path}/${file.name}`);
-  
-  // Upload the file
-  await uploadBytes(storageRef, file);
-  
-  // Get the download URL
-  const downloadURL = await getDownloadURL(storageRef);
-  
-  return downloadURL;
+  if (file.size > maxSizeInMB * 1024 * 1024) {
+    throw new Error(`File size exceeds ${maxSizeInMB}MB limit`);
+  }
+  try {
+    const storageRef = ref(storage, `companies/${companyId}/${path}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    throw new Error(`Failed to upload file: ${error}`);
+  }
 };
 
 /**
