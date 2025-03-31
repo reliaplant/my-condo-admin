@@ -1,4 +1,5 @@
-"use client";
+'use client';
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   AuthState, 
@@ -45,31 +46,58 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     loading: true
   });
   
+  // Initialize auth state on mount
   useEffect(() => {
-    const fetchAuthState = async () => {
+    let unsubscribe: (() => void) | null = null;
+    let mounted = true;
+    
+    const initializeAuth = async () => {
       try {
+        // First get the initial auth state
         const initialAuthState = await getCurrentAuthState();
-        setAuth(initialAuthState);
+        
+        if (mounted) {
+          setAuth(initialAuthState);
+          
+          // Then set up a listener for future changes
+          unsubscribe = listenToAuthChanges((authState) => {
+            if (mounted) {
+              console.log('Auth state changed:', JSON.stringify({
+                user: authState.user ? { uid: authState.user.uid, email: authState.user.email } : null,
+                profile: authState.profile ? { 
+                  uid: authState.profile.uid,
+                  email: authState.profile.email,
+                  role: authState.profile.role,
+                  companyId: authState.profile.companyId
+                } : null,
+                initialized: authState.initialized
+              }));
+              
+              setAuth(authState);
+            }
+          });
+        }
       } catch (error) {
         console.error('Error initializing auth state:', error);
-        setAuth({
-          user: null,
-          profile: null,
-          initialized: true,
-          loading: false
-        });
+        if (mounted) {
+          setAuth({
+            user: null,
+            profile: null,
+            initialized: true,
+            loading: false
+          });
+        }
       }
     };
     
-    fetchAuthState();
+    initializeAuth();
     
-    // Listen for auth state changes
-    const unsubscribe = listenToAuthChanges((authState) => {
-      setAuth(authState);
-    });
-    
+    // Cleanup function
     return () => {
-      unsubscribe();
+      mounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, []);
   
@@ -77,8 +105,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     setAuth((prev) => ({ ...prev, loading: true }));
     try {
       const profile = await signIn(credentials);
-      // Auth state listener will update the state
+      // Auth state listener will update the state automatically
+      console.log('Login successful:', profile.email);
     } catch (error) {
+      console.error('Login error in context:', error);
       setAuth((prev) => ({ ...prev, loading: false }));
       throw error;
     }
@@ -88,8 +118,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     setAuth((prev) => ({ ...prev, loading: true }));
     try {
       await logOut();
-      // Auth state listener will update the state
+      // Clear the state immediately instead of waiting for listener
+      setAuth({
+        user: null,
+        profile: null,
+        initialized: true,
+        loading: false
+      });
     } catch (error) {
+      console.error('Logout error:', error);
       setAuth((prev) => ({ ...prev, loading: false }));
       throw error;
     }
@@ -102,6 +139,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       // Don't auto-login after registration for this app
       setAuth((prev) => ({ ...prev, loading: false }));
     } catch (error) {
+      console.error('Registration error:', error);
       setAuth((prev) => ({ ...prev, loading: false }));
       throw error;
     }
@@ -111,6 +149,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     try {
       await resetPassword(email);
     } catch (error) {
+      console.error('Password reset error:', error);
       throw error;
     }
   };
@@ -127,6 +166,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         profile: updatedProfile
       }));
     } catch (error) {
+      console.error('Update profile error:', error);
       throw error;
     }
   };
@@ -135,6 +175,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     try {
       await changePassword(currentPassword, newPassword);
     } catch (error) {
+      console.error('Change password error:', error);
       throw error;
     }
   };
@@ -150,6 +191,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         }));
       }
     } catch (error) {
+      console.error('Change email error:', error);
       throw error;
     }
   };
@@ -162,24 +204,38 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     return belongsToCompany(auth.profile, companyId);
   };
   
+  const value = {
+    auth,
+    isAuthenticated: !!auth.user,
+    isInitialized: auth.initialized,
+    isLoading: auth.loading,
+    login,
+    logout,
+    register,
+    resetUserPassword,
+    updateProfile: updateProfileData,
+    changeUserPassword,
+    changeUserEmail,
+    hasUserRole,
+    userBelongsToCompany
+  };
+  
+  // Add debug info to help troubleshoot deployed auth issues
+  useEffect(() => {
+    console.log('Auth state updated:', {
+      isAuthenticated: !!auth.user,
+      isInitialized: auth.initialized,
+      isLoading: auth.loading,
+      user: auth.user ? { uid: auth.user.uid, email: auth.user.email } : null,
+      profile: auth.profile ? { 
+        role: auth.profile.role, 
+        companyId: auth.profile.companyId 
+      } : null
+    });
+  }, [auth]);
+  
   return (
-    <AuthContext.Provider
-      value={{
-        auth,
-        isAuthenticated: !!auth.user,
-        isInitialized: auth.initialized,
-        isLoading: auth.loading,
-        login,
-        logout,
-        register,
-        resetUserPassword,
-        updateProfile: updateProfileData,
-        changeUserPassword,
-        changeUserEmail,
-        hasUserRole,
-        userBelongsToCompany
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

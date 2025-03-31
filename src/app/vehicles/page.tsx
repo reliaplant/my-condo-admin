@@ -24,7 +24,7 @@ export default function VehicleRecordsPage() {
   // Check authentication
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/unauthorized');
     }
   }, [isAuthenticated, router]);
 

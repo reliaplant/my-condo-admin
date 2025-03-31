@@ -66,11 +66,15 @@ export default function Navbar() {
     try {
       await logout();
       closeMenus();
+      // Force navigation to login page
       window.location.href = '/login';
+      // Note: Using window.location instead of router.push() ensures a full page refresh
+      // which helps clear any lingering auth state and prevents navigation issues
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
+  
 
   return (
     <nav className="bg-white shadow-md">

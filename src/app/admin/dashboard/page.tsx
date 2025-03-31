@@ -16,7 +16,7 @@ export default function SuperAdminDashboard() {
   // Check authentication and authorization
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/unauthorized');
       return;
     }
     

@@ -31,7 +31,7 @@ export default function Dashboard() {
   // Check authentication
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/unauthorized');
     }
   }, [isAuthenticated, router]);
 

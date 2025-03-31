@@ -1,5 +1,7 @@
-import React, { ReactNode, useEffect } from 'react';
-import { useRouter } from 'next/router';
+'use client';
+
+import React, { ReactNode, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/lib/authService';
 
@@ -8,6 +10,7 @@ interface AuthGuardProps {
   requiredRoles?: UserRole[];
   requiredCompanyId?: string;
   redirectTo?: string;
+  loadingComponent?: ReactNode;
 }
 
 /**
@@ -21,51 +24,81 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
   children,
   requiredRoles,
   requiredCompanyId,
-  redirectTo = '/login'
+  redirectTo = '/login',
+  loadingComponent = (
+    <div className="flex justify-center items-center min-h-screen">
+      <div className="w-12 h-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+    </div>
+  )
 }) => {
   const { isAuthenticated, isInitialized, isLoading, auth, hasUserRole, userBelongsToCompany } = useAuth();
   const router = useRouter();
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   
   useEffect(() => {
-    if (isInitialized && !isLoading && !isAuthenticated) {
-      // Not authenticated, redirect to login
+    // Don't make any decisions until auth is initialized
+    if (!isInitialized) {
+      return;
+    }
+    
+    if (!isAuthenticated) {
+      console.log('AuthGuard: Not authenticated, redirecting to', redirectTo);
+      setHasAccess(false);
       router.push(redirectTo);
       return;
     }
     
-    if (isAuthenticated && auth.profile) {
+    if (auth.profile) {
+      let accessGranted = true;
+      
       // Check role requirements if specified
       if (requiredRoles && !hasUserRole(requiredRoles)) {
+        console.log('AuthGuard: Role check failed', { 
+          userRole: auth.profile.role, 
+          requiredRoles 
+        });
+        accessGranted = false;
+      }
+      
+      // Check company requirements if specified
+      if (accessGranted && requiredCompanyId && !userBelongsToCompany(requiredCompanyId)) {
+        console.log('AuthGuard: Company check failed', { 
+          userCompanyId: auth.profile.companyId, 
+          requiredCompanyId 
+        });
+        accessGranted = false;
+      }
+      
+      if (!accessGranted) {
+        console.log('AuthGuard: Access denied, redirecting to /unauthorized');
+        setHasAccess(false);
         router.push('/unauthorized');
         return;
       }
       
-      // Check company requirements if specified
-      if (requiredCompanyId && !userBelongsToCompany(requiredCompanyId)) {
-        router.push('/unauthorized');
-        return;
-      }
+      console.log('AuthGuard: Access granted');
+      setHasAccess(true);
     }
-  }, [isAuthenticated, isInitialized, isLoading, auth.profile, requiredRoles, requiredCompanyId, router, redirectTo, hasUserRole, userBelongsToCompany]);
+  }, [
+    isAuthenticated, 
+    isInitialized, 
+    auth.profile, 
+    requiredRoles, 
+    requiredCompanyId, 
+    router, 
+    redirectTo, 
+    hasUserRole, 
+    userBelongsToCompany
+  ]);
   
-  // Show loading state while initializing auth
-  if (!isInitialized || isLoading) {
-    return <div>Loading...</div>;
+  // Show loading state while initializing auth or checking access
+  if (!isInitialized || isLoading || hasAccess === null) {
+    return <>{loadingComponent}</>;
   }
   
-  // Not authenticated, don't render children (will redirect in useEffect)
-  if (!isAuthenticated) {
+  // If access is denied, don't render children
+  if (!hasAccess) {
     return null;
-  }
-  
-  // Check role requirements
-  if (requiredRoles && !hasUserRole(requiredRoles)) {
-    return null; // Will redirect in useEffect
-  }
-  
-  // Check company requirements
-  if (requiredCompanyId && !userBelongsToCompany(requiredCompanyId)) {
-    return null; // Will redirect in useEffect
   }
   
   // All checks passed, render children

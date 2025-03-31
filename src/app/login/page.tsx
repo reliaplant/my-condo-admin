@@ -20,20 +20,21 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && auth.profile) {
-      // Redirect based on role
-      switch (auth.profile.role) {
-        case 'superAdmin':
-          router.push('/admin/dashboard');
-          break;
-        case 'admin':
-          router.push('/dashboard');
-          break;
-        case 'employee':
-          router.push('/dashboard');
-          break;
-        default:
-          router.push('/dashboard');
-      }
+      console.log("Login successful, redirecting based on role");
+      // Add a small delay to ensure auth state is properly synchronized
+      setTimeout(() => {
+        switch (auth?.profile?.role) {
+          case 'superAdmin':
+            router.push('/admin/dashboard');
+            break;
+          case 'admin':
+          case 'employee':
+            router.push('/dashboard');
+            break;
+          default:
+            router.push('/dashboard');
+        }
+      }, 100);
     }
   }, [isAuthenticated, auth.profile, router]);
   
@@ -44,21 +45,15 @@ export default function LoginPage() {
     
     try {
       await login({ email, password });
-      // Redirect is handled in the useEffect above
+      // Don't redirect here - let the useEffect handle it
     } catch (err: any) {
       console.error('Login error:', err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        setError('Credenciales inválidas. Por favor, verifique su email y contraseña.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Demasiados intentos fallidos. Por favor, intente más tarde o restablezca su contraseña.');
-      } else {
-        setError('Error al iniciar sesión. Por favor, intente nuevamente.');
-      }
+      setError('Invalid credentials. Please try again.');
     } finally {
       setLoading(false);
     }
   };
-  
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
