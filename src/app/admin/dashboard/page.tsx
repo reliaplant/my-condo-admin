@@ -6,8 +6,40 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getSystemStats } from '@/services/superAdminService';
 import Link from 'next/link';
 
+interface SystemStats {
+  totalCompanies: number;
+  activeCompanies: number;
+  totalUsers: number;
+  activeUsers: number;
+  usersByRole: {
+    superAdmin: number;
+    admin: number;
+    user: number;
+  };
+  recentCompanies: Array<{
+    id: string;
+    name: string;
+    contactName: string;
+    contactEmail: string;
+    userCount: number;
+    isActive: boolean;
+    createdAt: Date;
+  }>;
+  recentUsers: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    companyId: string;
+    companyName: string;
+    isActive: boolean;
+    lastLogin: Date | null;
+    createdAt: Date;
+  }>;
+}
+
 export default function SuperAdminDashboard() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<SystemStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   const { isAuthenticated, hasUserRole, isInitialized} = useAuth();
@@ -29,7 +61,7 @@ export default function SuperAdminDashboard() {
       router.push('/unauthorized');
       return;
     }
-  }, [isAuthenticated, hasUserRole, router]);
+  }, [isAuthenticated, hasUserRole, router, isInitialized]);
   
   useEffect(() => {
     if (!isInitialized || !isAuthenticated) {
@@ -49,7 +81,8 @@ export default function SuperAdminDashboard() {
     };
     
     fetchStats();
-  }, [isAuthenticated, hasUserRole]);
+  }, [isAuthenticated, hasUserRole, isInitialized]);
+  
   // Don't render anything until auth is initialized
   if (!isInitialized) {
     return (
@@ -63,6 +96,7 @@ export default function SuperAdminDashboard() {
       </div>
     );
   }
+  
   if (!isAuthenticated || !hasUserRole('superAdmin')) {
     return null; // Will redirect in useEffect
   }
@@ -172,7 +206,7 @@ export default function SuperAdminDashboard() {
             </Link>
           </div>
           
-          {/* Sample company list - would be replaced with actual data */}
+          {/* Dynamic company list from stats */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -195,35 +229,48 @@ export default function SuperAdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                <tr>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                        TI
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">Thandi Inc.</div>
-                        <div className="text-sm text-gray-500">Admin por defecto</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">Admin User</div>
-                    <div className="text-sm text-gray-500">admin@thandi.com</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    10 usuarios
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                      Activa
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Link href="/companies/thandi" className="text-blue-600 hover:text-blue-900">Gestionar</Link>
-                  </td>
-                </tr>
-                {/* Additional company rows would be populated from actual data */}
+                {stats?.recentCompanies && stats.recentCompanies.length > 0 ? (
+                  stats.recentCompanies.map((company) => (
+                    <tr key={company.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                            {company.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{company.name}</div>
+                            <div className="text-sm text-gray-500">ID: {company.id.slice(0, 6)}...</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{company.contactName}</div>
+                        <div className="text-sm text-gray-500">{company.contactEmail}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {company.userCount} usuarios
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          company.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {company.isActive ? 'Activa' : 'Inactiva'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <Link href={`/companies/${company.id}`} className="text-blue-600 hover:text-blue-900">Gestionar</Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                      No hay empresas para mostrar.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -241,7 +288,7 @@ export default function SuperAdminDashboard() {
             </Link>
           </div>
           
-          {/* Sample users list - would be replaced with actual data */}
+          {/* Dynamic users list from stats */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -264,34 +311,53 @@ export default function SuperAdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                <tr>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 flex-shrink-0 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                        A
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">Admin User</div>
-                        <div className="text-sm text-gray-500">admin@thandi.com</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">Administrador</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    Thandi Inc.
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                      Activo
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Link href="/users/1" className="text-blue-600 hover:text-blue-900">Editar</Link>
-                  </td>
-                </tr>
-                {/* Additional user rows would be populated from actual data */}
+                {stats?.recentUsers && stats.recentUsers.length > 0 ? (
+                  stats.recentUsers.map((user) => (
+                    <tr key={user.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className={`h-10 w-10 flex-shrink-0 ${
+                            user.role === 'superAdmin' 
+                              ? 'bg-purple-100 text-purple-600' 
+                              : user.role === 'admin' 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-green-100 text-green-600'
+                          } rounded-full flex items-center justify-center font-bold`}>
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                            <div className="text-sm text-gray-500">{user.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{user.role}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.companyName || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          user.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {user.isActive ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <Link href={`/users/${user.id}`} className="text-blue-600 hover:text-blue-900">Editar</Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                      No hay usuarios para mostrar.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
